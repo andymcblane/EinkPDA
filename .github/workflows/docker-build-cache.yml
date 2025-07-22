@@ -1,0 +1,46 @@
+name: Docker Build with Cache
+
+on:
+  push:
+    paths:
+      - 'Code/PocketMage_V3/**'
+      - 'Dockerfile'
+      - '.github/workflows/docker-build-cache.yml'
+  pull_request:
+    paths:
+      - 'Code/PocketMage_V3/**'
+      - 'Dockerfile'
+
+jobs:
+  docker-build-test:
+    name: Docker Build with Layer Caching
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build and cache Docker layers
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        tags: einkpda-tests:${{ github.sha }}
+        
+    - name: Run tests in cached container
+      run: |
+        docker run --rm einkpda-tests:${{ github.sha }}
+        
+    - name: Show cache stats
+      run: |
+        echo "Docker layer cache statistics:"
+        docker system df
+        echo ""
+        echo "Build cache info:"
+        docker buildx du --verbose 
