@@ -9,6 +9,14 @@ set -e  # Exit on any error
 IMAGE_NAME="pocketmage-v3-tests"
 CONTAINER_NAME="pocketmage-tests-runner"
 WORKSPACE_DIR="$(pwd)"
+# Convert to Windows path if running on Git Bash or similar on Windows
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+  WORKSPACE_DIR="$(pwd -W)"
+  DOCKER="docker.exe"
+  export MSYS_NO_PATHCONV=1
+else
+  DOCKER="docker"
+fi
 PROJECT_DIR="Code/PocketMage_V3"
 
 # Colors for output
@@ -37,9 +45,9 @@ log_error() {
 
 # Function to clean up existing container
 cleanup_container() {
-    if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    if $DOCKER ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         log_info "Removing existing container: ${CONTAINER_NAME}"
-        docker rm -f "${CONTAINER_NAME}" > /dev/null 2>&1 || true
+        $DOCKER rm -f "${CONTAINER_NAME}" > /dev/null 2>&1 || true
     fi
 }
 
@@ -47,7 +55,7 @@ cleanup_container() {
 build_image() {
     log_info "Building Docker image: ${IMAGE_NAME}"
     
-    if ! docker build -t "${IMAGE_NAME}" .; then
+    if ! $DOCKER build -t "${IMAGE_NAME}" .; then
         log_error "Failed to build Docker image"
         exit 1
     fi
@@ -66,7 +74,7 @@ run_tests() {
     cleanup_container
     
     # Run the container with workspace mounted
-    if ! docker run \
+    if ! $DOCKER run \
         --name "${CONTAINER_NAME}" \
         --rm \
         -v "${WORKSPACE_DIR}:/workspace" \
@@ -86,7 +94,7 @@ run_shell() {
     
     cleanup_container
     
-    docker run \
+    $DOCKER run \
         --name "${CONTAINER_NAME}" \
         --rm \
         -it \
@@ -122,9 +130,9 @@ clean_docker() {
     
     cleanup_container
     
-    if docker images --format '{{.Repository}}' | grep -q "^${IMAGE_NAME}$"; then
+    if $DOCKER images --format '{{.Repository}}' | grep -q "^${IMAGE_NAME}$"; then
         log_info "Removing Docker image: ${IMAGE_NAME}"
-        docker rmi "${IMAGE_NAME}" > /dev/null 2>&1 || true
+        $DOCKER rmi "${IMAGE_NAME}" > /dev/null 2>&1 || true
     fi
     
     log_success "Cleanup completed"
