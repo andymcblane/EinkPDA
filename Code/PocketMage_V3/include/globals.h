@@ -81,6 +81,7 @@ public:
 #define GxEPD_WHITE 0
 #define GxEPD_BLACK 1
 #define TASKS_FILE "test_tasks.txt"
+#define STOOL_FILE "test_stool.txt"
 #ifdef Serial
 #undef Serial
 #endif
@@ -88,9 +89,10 @@ public:
 
 // Common enums (same for both environments)
 enum KBState { NORMAL, SHIFT, FUNC };
-enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
+enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON, STOOL };
 enum TasksState { TASKS0, TASKS0_NEWTASK, TASKS1, TASKS1_EDITTASK };
 enum HOMEState { HOME_HOME, NOWLATER };
+enum StoolState { STOOL0, STOOL1, STOOL1_EDIT };
 
 #ifndef NATIVE_TEST_FILE_DEFINED
 #define NATIVE_TEST_FILE_DEFINED
@@ -173,6 +175,7 @@ struct MockU8g2 {
 
 // Global variable declarations for native testing
 extern std::vector<std::vector<String>> tasks;
+extern std::vector<std::vector<String>> stoolEntries;
 extern MockSD_MMC SD_MMC;
 extern MockDisplay display;
 extern MockU8g2 u8g2;
@@ -188,6 +191,11 @@ extern int editTaskState;
 extern String newTaskName;
 extern String newTaskDueDate;
 
+// STOOL app variables for native test
+extern StoolState CurrentStoolState;
+extern uint8_t selectedStoolEntry;
+extern String newStoolNote;
+
 // Function prototypes for native testing (only those needed for tests)
 // TASKS.cpp functions
 void TASKS_INIT();
@@ -198,6 +206,16 @@ void updateTasksFile();
 void deleteTask(int index);
 String convertDateFormat(String yyyymmdd);
 void processKB_TASKS();
+
+// STOOL.cpp functions
+void STOOL_INIT();
+void processKB_STOOL();
+void addStoolEntry(int type, String note);
+void updateStoolArray();
+void updateStoolFile();
+void deleteStoolEntry(int index);
+String getStoolTypeDescription(int type);
+String formatStoolTimestamp(String timestamp);
 
 // Mock functions that will be defined in test files
 void setCpuFrequencyMhz(int freq);
@@ -323,7 +341,7 @@ extern KBState CurrentKBState;
 extern uint8_t partialCounter;
 extern volatile bool forceSlowFullUpdate;
 
-enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
+enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON, STOOL };
 extern const String appStateNames[];
 extern const unsigned char *appIcons[9];
 extern AppState CurrentAppState;
@@ -391,6 +409,13 @@ extern CalendarState CurrentCalendarState;
 // <LEXICON.cpp>
 enum LexState {MENU, DEF};
 extern LexState CurrentLexState;
+
+// <STOOL.cpp>
+extern std::vector<std::vector<String>> stoolEntries;
+enum StoolState { STOOL0, STOOL1, STOOL1_EDIT };
+extern StoolState CurrentStoolState;
+extern uint8_t selectedStoolEntry;
+extern String newStoolNote;
 
 // FUNCTION PROTOTYPES
 // <sysFunc.cpp>
@@ -506,6 +531,17 @@ void einkHandler_CALENDAR();
 void LEXICON_INIT();
 void processKB_LEXICON();
 void einkHandler_LEXICON();
+
+// <STOOL.cpp>
+void STOOL_INIT();
+void processKB_STOOL();
+void einkHandler_STOOL();
+void addStoolEntry(int type, String note);
+void updateStoolArray();
+void updateStoolFile();
+void deleteStoolEntry(int index);
+String getStoolTypeDescription(int type);
+String formatStoolTimestamp(String timestamp);
 
 // <PocketMage>
 void applicationEinkHandler();
