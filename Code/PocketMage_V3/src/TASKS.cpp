@@ -7,6 +7,13 @@
 //     o888o     o88o     o8888o 8""88888P'  o888o  o888o 8""88888P'  //  
 #include "globals.h"                                                 
 
+#ifndef NATIVE_TEST
+// Hardware-specific code
+#else
+// Native-specific code
+#endif
+
+// Functions with conditional logic
 void TASKS_INIT() {
   CurrentAppState = TASKS;
   CurrentTasksState = TASKS0;
@@ -21,7 +28,6 @@ void sortTasksByDueDate(std::vector<std::vector<String>> &tasks) {
 }
 
 void addTask(String taskName, String dueDate, String priority, String completed) {
-  String taskInfo = taskName+"|"+dueDate+"|"+priority+"|"+completed;
   updateTaskArray();
   tasks.push_back({taskName, dueDate, priority, completed});
   sortTasksByDueDate(tasks);
@@ -32,40 +38,44 @@ void updateTaskArray() {
   SDActive = true;
   setCpuFrequencyMhz(240);
   delay(50);
-  File file = SD_MMC.open("/sys/tasks.txt", "r"); // Open the text file in read mode
+  
+  File file = SD_MMC.open(TASKS_FILE, "r");
   if (!file) {
+    #ifndef NATIVE_TEST
     Serial.println("Failed to open file for reading");
+    #else
+    std::cout << "Failed to open file for reading" << std::endl;
+    #endif
     return;
   }
 
-  tasks.clear(); // Clear the existing vector before loading the new data
+  tasks.clear();
 
-  // Loop through the file, line by line
   while (file.available()) {
-    String line = file.readStringUntil('\n');  // Read a line from the file
-    line.trim();  // Remove any extra spaces or newlines
+    String line = file.readStringUntil('\n');
+    line.trim();
     
-    // Skip empty lines
     if (line.length() == 0) {
       continue;
     }
 
-    // Split the line into individual parts using the delimiter '|'
-    uint8_t delimiterPos1 = line.indexOf('|');
-    uint8_t delimiterPos2 = line.indexOf('|', delimiterPos1 + 1);
-    uint8_t delimiterPos3 = line.indexOf('|', delimiterPos2 + 1);
+    int delimiterPos1 = line.indexOf('|');
+    int delimiterPos2 = line.indexOf('|', delimiterPos1 + 1);
+    int delimiterPos3 = line.indexOf('|', delimiterPos2 + 1);
 
-    // Extract task name, due date, priority, and completed status
-    String taskName  = line.substring(0, delimiterPos1);
-    String dueDate   = line.substring(delimiterPos1 + 1, delimiterPos2);
-    String priority  = line.substring(delimiterPos2 + 1, delimiterPos3);
+    if (delimiterPos1 == -1 || delimiterPos2 == -1 || delimiterPos3 == -1) {
+      continue; // Skip malformed lines
+    }
+
+    String taskName = line.substring(0, delimiterPos1);
+    String dueDate = line.substring(delimiterPos1 + 1, delimiterPos2);
+    String priority = line.substring(delimiterPos2 + 1, delimiterPos3);
     String completed = line.substring(delimiterPos3 + 1);
 
-    // Add the task to the vector
     tasks.push_back({taskName, dueDate, priority, completed});
   }
 
-  file.close();  // Close the file
+  file.close();
 
   if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
   SDActive = false;
@@ -75,16 +85,12 @@ void updateTasksFile() {
   SDActive = true;
   setCpuFrequencyMhz(240);
   delay(50);
-  // Clear the existing tasks file first
-  delFile("/sys/tasks.txt");
+  
+  delFile(TASKS_FILE);
 
-  // Iterate through the tasks vector and append each task to the file
   for (size_t i = 0; i < tasks.size(); i++) {
-    // Create a string from the task's attributes with "|" delimiter
     String taskInfo = tasks[i][0] + "|" + tasks[i][1] + "|" + tasks[i][2] + "|" + tasks[i][3];
-    
-    // Append the task info to the file
-    appendToFile("/sys/tasks.txt", taskInfo);
+    appendToFile(TASKS_FILE, taskInfo);
   }
 
   if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
@@ -92,27 +98,39 @@ void updateTasksFile() {
 }
 
 void deleteTask(int index) {
-  if (index >= 0 && index < tasks.size()) {
+  if (index >= 0 && index < (int)tasks.size()) {
     tasks.erase(tasks.begin() + index);
   }
 }
 
 String convertDateFormat(String yyyymmdd) {
   if (yyyymmdd.length() != 8) {
+    #ifndef NATIVE_TEST
     Serial.println(("INVALID DATE: " + yyyymmdd).c_str());
+    #else
+    std::cout << "INVALID DATE: " << yyyymmdd << std::endl;
+    #endif
     return "Invalid";
   }
 
-  String year = yyyymmdd.substring(2, 4);  // Get last two digits of the year
+  String year = yyyymmdd.substring(2, 4);
   String month = yyyymmdd.substring(4, 6);
   String day = yyyymmdd.substring(6, 8);
 
   return month + "/" + day + "/" + year;
 }
 
+#ifndef NATIVE_TEST
+// Only include complex UI functions for ESP32 build
 void processKB_TASKS() {
+#else
+// Include simplified version for testing
+void processKB_TASKS() {
+#endif
   if (OLEDPowerSave) {
+    #ifndef NATIVE_TEST
     u8g2.setPowerSave(0);
+    #endif
     OLEDPowerSave = false;
   }
   int currentMillis = millis();
@@ -162,7 +180,9 @@ void processKB_TASKS() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
+          #ifndef NATIVE_TEST
           oledWord(currentWord);
+          #endif
         }
         KBBounceMillis = currentMillis;
       }
@@ -217,8 +237,10 @@ void processKB_TASKS() {
 
                 // ADD NEW TASK
                 addTask(newTaskName, newTaskDueDate, "0", "0");
+                #ifndef NATIVE_TEST
                 oledWord("New Task Added");
                 delay(1000);
+                #endif
 
                 // RETURN
                 currentLine = "";
@@ -228,8 +250,10 @@ void processKB_TASKS() {
               }
               // DATE IS INVALID
               else {
+                #ifndef NATIVE_TEST
                 oledWord("Invalid Date");
                 delay(1000);
+                #endif
                 currentLine = "";
               }
               break;
@@ -248,7 +272,9 @@ void processKB_TASKS() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
+          #ifndef NATIVE_TEST
           oledLine(currentLine, false);
+          #endif
         }
       }
       break;
@@ -295,7 +321,9 @@ void processKB_TASKS() {
         //Make sure oled only updates at 60fps
         if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
           OLEDFPSMillis = currentMillis;
+          #ifndef NATIVE_TEST
           oledWord(currentWord);
+          #endif
         }
         KBBounceMillis = currentMillis;
       }
@@ -304,7 +332,13 @@ void processKB_TASKS() {
   }
 }
 
+#ifndef NATIVE_TEST
 void einkHandler_TASKS() {
+#else
+// Skip einkHandler_TASKS for native testing - it has too many hardware dependencies
+/*
+void einkHandler_TASKS() {
+#endif
   switch (CurrentTasksState) {
     case TASKS0:
       if (newState) {
@@ -400,3 +434,6 @@ void einkHandler_TASKS() {
     
   }
 }
+#ifdef NATIVE_TEST
+*/
+#endif

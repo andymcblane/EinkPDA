@@ -1,7 +1,167 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
-// LIBRARIES
+#ifdef NATIVE_TEST
+// Native testing environment
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <iostream>
+#include <fstream>
+#include <cstdio>
+#include <chrono>
+#include <thread>
+
+// Mock String class with Arduino-like methods
+class String : public std::string {
+public:
+  String() : std::string() {}
+  String(const char* s) : std::string(s) {}
+  String(const std::string& s) : std::string(s) {}
+  String(int i) : std::string(std::to_string(i)) {}
+  
+  String substring(size_t from, size_t to = std::string::npos) const {
+    if (to == std::string::npos) return substr(from);
+    return substr(from, to - from);
+  }
+  
+  int indexOf(char c, size_t from = 0) const {
+    size_t pos = find(c, from);
+    return (pos == std::string::npos ? -1 : (int)pos);
+  }
+  
+  int indexOf(const String& s, size_t from = 0) const {
+    size_t pos = find(s, from);
+    return (pos == std::string::npos ? -1 : (int)pos);
+  }
+  
+  void trim() {
+    size_t start = find_first_not_of(" \t\n\r\f\v");
+    if (start == std::string::npos) {
+      clear();
+      return;
+    }
+    size_t end = find_last_not_of(" \t\n\r\f\v");
+    *this = substr(start, end - start + 1);
+  }
+  
+  void remove(size_t index) {
+    if (index < length()) erase(index, 1);
+  }
+  
+  String& operator+=(const String& rhs) { append(rhs); return *this; }
+  String& operator+=(const char* rhs) { append(rhs); return *this; }
+  String& operator+=(char c) { push_back(c); return *this; }
+};
+
+// Mock constants and defines
+#define GxEPD_WHITE 0
+#define GxEPD_BLACK 1
+#define TASKS_FILE "test_tasks.txt"
+#define Serial std::cout
+#define MAX_FILES 10
+
+// Common enums (same for both environments)
+enum KBState { NORMAL, SHIFT, FUNC };
+enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOURNAL, LEXICON };
+enum TasksState { TASKS0, TASKS0_NEWTASK, TASKS1, TASKS1_EDITTASK };
+enum HOMEState { HOME_HOME, NOWLATER };
+
+// Mock File class
+class File {
+public:
+  std::fstream fs;
+  File() = default;
+  File(std::fstream&& f) : fs(std::move(f)) {}
+  
+  operator bool() const { return fs.is_open() && fs.good(); }
+  bool available() { return fs.good() && !fs.eof(); }
+  
+  String readStringUntil(char delimiter) {
+    String result;
+    std::getline(fs, result, delimiter);
+    return result;
+  }
+  
+  void close() { fs.close(); }
+};
+
+// Mock SD_MMC
+struct MockSD_MMC {
+  File open(const String& path, const char* mode) {
+    std::fstream f;
+    std::ios_base::openmode openmode = std::ios::in | std::ios::out;
+    
+    if (std::string(mode) == "r") {
+      openmode = std::ios::in;
+    } else if (std::string(mode) == "w") {
+      openmode = std::ios::out | std::ios::trunc;
+    } else if (std::string(mode) == "a") {
+      openmode = std::ios::out | std::ios::app;
+    }
+    
+    f.open(path, openmode);
+    return File(std::move(f));
+  }
+  
+  bool exists(const String& path) { 
+    std::ifstream f(path);
+    return f.good();
+  }
+};
+
+// Mock hardware objects
+struct MockDisplay {
+  void setRotation(int) {}
+  void setFullWindow() {}
+  void fillScreen(int) {}
+  void drawBitmap(int, int, const unsigned char*, int, int, int) {}
+  void setFont(const void*) {}
+  void setCursor(int, int) {}
+  void print(const char*) {}
+};
+
+struct MockU8g2 {
+  void setPowerSave(int) {}
+};
+
+// Global variable declarations for native testing
+extern std::vector<std::vector<String>> tasks;
+extern MockSD_MMC SD_MMC;
+extern MockDisplay display;
+extern MockU8g2 u8g2;
+
+// Variable declarations for native test (compatible with test file types)
+extern AppState CurrentAppState;
+extern TasksState CurrentTasksState;
+extern HOMEState CurrentHOMEState;
+extern KBState CurrentKBState;
+extern int selectedTask;
+extern int newTaskState;
+extern int editTaskState;
+extern String newTaskName;
+extern String newTaskDueDate;
+
+// Function prototypes for native testing (only those needed for tests)
+// TASKS.cpp functions
+void TASKS_INIT();
+void sortTasksByDueDate(std::vector<std::vector<String>> &tasks);
+void addTask(String taskName, String dueDate, String priority, String completed);
+void updateTaskArray();
+void updateTasksFile();
+void deleteTask(int index);
+String convertDateFormat(String yyyymmdd);
+void processKB_TASKS();
+
+// Mock functions that will be defined in test files
+void setCpuFrequencyMhz(int freq);
+void delay(int ms);
+void refresh();
+char updateKeypress();
+int millis();
+
+#else
+// Hardware environment (ESP32)
 #include <Arduino.h>
 #include <GxEPD2_BW.h>
 #include <U8g2lib.h>
@@ -296,9 +456,10 @@ void LEXICON_INIT();
 void processKB_LEXICON();
 void einkHandler_LEXICON();
 
-
 // <PocketMage>
 void applicationEinkHandler();
 void processKB();
+
+#endif
 
 #endif // GLOBALS_H
