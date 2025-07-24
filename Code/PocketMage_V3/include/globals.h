@@ -13,6 +13,8 @@
 #include <thread>
 
 // Mock String class with Arduino-like methods
+#ifndef NATIVE_TEST_STRING_DEFINED
+#define NATIVE_TEST_STRING_DEFINED
 class String : public std::string {
 public:
   String() : std::string() {}
@@ -52,13 +54,36 @@ public:
   String& operator+=(const String& rhs) { append(rhs); return *this; }
   String& operator+=(const char* rhs) { append(rhs); return *this; }
   String& operator+=(char c) { push_back(c); return *this; }
+
+  int toInt() const {
+    try { return std::stoi(*this); } catch (...) { return 0; }
+  }
+  void toLowerCase() {
+    std::transform(begin(), end(), begin(), ::tolower);
+  }
+  bool startsWith(const String& prefix) const {
+    return this->find(prefix) == 0;
+  }
+  bool equalsIgnoreCase(const String& other) const {
+    if (length() != other.length()) return false;
+    for (size_t i = 0; i < length(); ++i) {
+      if (tolower((*this)[i]) != tolower(other[i])) return false;
+    }
+    return true;
+  }
+  char charAt(size_t idx) const {
+    return at(idx);
+  }
 };
+#endif // NATIVE_TEST_STRING_DEFINED
 
 // Mock constants and defines
 #define GxEPD_WHITE 0
 #define GxEPD_BLACK 1
 #define TASKS_FILE "test_tasks.txt"
-#define Serial std::cout
+#ifdef Serial
+#undef Serial
+#endif
 #define MAX_FILES 10
 
 // Common enums (same for both environments)
@@ -67,6 +92,8 @@ enum AppState { HOME, TXT, FILEWIZ, USB_APP, BT, SETTINGS, TASKS, CALENDAR, JOUR
 enum TasksState { TASKS0, TASKS0_NEWTASK, TASKS1, TASKS1_EDITTASK };
 enum HOMEState { HOME_HOME, NOWLATER };
 
+#ifndef NATIVE_TEST_FILE_DEFINED
+#define NATIVE_TEST_FILE_DEFINED
 // Mock File class
 class File {
 public:
@@ -85,21 +112,35 @@ public:
   
   void close() { fs.close(); }
 };
+#endif // NATIVE_TEST_FILE_DEFINED
 
+#ifndef NATIVE_TEST_SDMMC_DEFINED
+#define NATIVE_TEST_SDMMC_DEFINED
 // Mock SD_MMC
 struct MockSD_MMC {
   File open(const String& path, const char* mode) {
     std::fstream f;
     std::ios_base::openmode openmode = std::ios::in | std::ios::out;
-    
+    std::string spath = path;
     if (std::string(mode) == "r") {
       openmode = std::ios::in;
     } else if (std::string(mode) == "w") {
       openmode = std::ios::out | std::ios::trunc;
+      // Create parent directory if needed
+      size_t slash = spath.find_last_of("/");
+      if (slash != std::string::npos) {
+        std::string dir = spath.substr(0, slash);
+        system(("mkdir -p " + dir).c_str());
+      }
     } else if (std::string(mode) == "a") {
       openmode = std::ios::out | std::ios::app;
+      // Create parent directory if needed
+      size_t slash = spath.find_last_of("/");
+      if (slash != std::string::npos) {
+        std::string dir = spath.substr(0, slash);
+        system(("mkdir -p " + dir).c_str());
+      }
     }
-    
     f.open(path, openmode);
     return File(std::move(f));
   }
@@ -109,16 +150,20 @@ struct MockSD_MMC {
     return f.good();
   }
 };
+#endif // NATIVE_TEST_SDMMC_DEFINED
 
 // Mock hardware objects
 struct MockDisplay {
   void setRotation(int) {}
   void setFullWindow() {}
   void fillScreen(int) {}
-  void drawBitmap(int, int, const unsigned char*, int, int, int) {}
+  void drawBitmap(int, int, const unsigned char*, int, int, int = 0) {}
   void setFont(const void*) {}
   void setCursor(int, int) {}
-  void print(const char*) {}
+  void print(const char* s) {}
+  void print(int i) {}
+  void setTextColor(int) {}
+  void fillRect(int, int, int, int, int) {}
 };
 
 struct MockU8g2 {
@@ -159,6 +204,11 @@ void delay(int ms);
 void refresh();
 char updateKeypress();
 int millis();
+
+// Native implementation of stringToInt
+inline int stringToInt(const String& str) {
+    try { return std::stoi(str); } catch (...) { return 0; }
+}
 
 #else
 // Hardware environment (ESP32)

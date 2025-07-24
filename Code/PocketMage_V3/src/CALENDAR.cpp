@@ -25,7 +25,7 @@ void updateEventArray() {
   setCpuFrequencyMhz(240);
   delay(50);
 
-  File file = SD_MMC.open("/sys/events.txt", "r"); // Open the text file in read mode
+  File file = SD_MMC.open(EVENTS_FILE, "r"); // Open the text file in read mode
   if (!file) {
     Serial.println("Failed to open file for reading");
     return;
@@ -78,7 +78,7 @@ void updateEventsFile() {
   setCpuFrequencyMhz(240);
   delay(50);
   // Clear the existing calendarEvents file first
-  delFile("/sys/events.txt");
+  delFile(EVENTS_FILE);
 
   // Iterate through the calendarEvents vector and append each task to the file
   for (size_t i = 0; i < calendarEvents.size(); i++) {
@@ -86,7 +86,7 @@ void updateEventsFile() {
     String eventInfo = calendarEvents[i][0] + "|" + calendarEvents[i][1] + "|" + calendarEvents[i][2] + "|" + calendarEvents[i][3]+ "|" + calendarEvents[i][4]+ "|" + calendarEvents[i][5];
     
     // Append the task info to the file
-    appendToFile("/sys/events.txt", eventInfo);
+    appendToFile(EVENTS_FILE, eventInfo);
   }
 
   if (SAVE_POWER) setCpuFrequencyMhz(POWER_SAVE_FREQ);
