@@ -161,6 +161,7 @@ struct MockDisplay {
   void setFont(const void*) {}
   void setCursor(int, int) {}
   void print(const char* s) {}
+  void print(const String& s) {}
   void print(int i) {}
   void setTextColor(int) {}
   void fillRect(int, int, int, int, int) {}
